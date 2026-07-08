@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# vmctl macOS installer.
+# vmctl macOS/Linux installer.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/nobreak-labs/vmctl-releases/main/install.sh | bash
@@ -31,19 +31,29 @@ info()  { printf '\033[36m%s\033[0m\n' "$1"; }
 ok()    { printf '\033[32m%s\033[0m\n' "$1"; }
 error() { printf '\033[31m%s\033[0m\n' "$1" >&2; }
 
-if [ "$(uname -s)" != "Darwin" ]; then
-    error "This installer is for macOS only (detected: $(uname -s))."
-    exit 1
-fi
+case "$(uname -s)" in
+    Darwin) OS="macos" ;;
+    Linux)  OS="linux" ;;
+    *)
+        error "This installer supports macOS and Linux only (detected: $(uname -s))."
+        exit 1
+        ;;
+esac
 
 case "$(uname -m)" in
-    arm64)  ARCH="arm64" ;;
-    x86_64) ARCH="amd64" ;;
+    arm64|aarch64) ARCH="arm64" ;;
+    x86_64)        ARCH="amd64" ;;
     *)
         error "Unsupported architecture: $(uname -m)"
         exit 1
         ;;
 esac
+
+# 릴리즈 바이너리가 없는 조합은 미리 안내 (Linux는 amd64만 배포)
+if [ "$OS" = "linux" ] && [ "$ARCH" != "amd64" ]; then
+    error "No linux-${ARCH} binary is published (linux supports amd64 only)."
+    exit 1
+fi
 
 if ! command -v curl >/dev/null 2>&1; then
     error "curl is required but not found."
@@ -72,11 +82,11 @@ fi
 asset_url="$(printf '%s' "$release_json" \
     | grep -o '"browser_download_url": *"[^"]*"' \
     | sed -E 's/.*"(https:[^"]+)"$/\1/' \
-    | grep "vmctl-.*-macos-${ARCH}\$" \
+    | grep "vmctl-.*-${OS}-${ARCH}\$" \
     | head -n1)"
 
 if [ -z "$asset_url" ]; then
-    error "No macos-${ARCH} asset found in release '$tag' of $REPO"
+    error "No ${OS}-${ARCH} asset found in release '$tag' of $REPO"
     exit 1
 fi
 
@@ -89,8 +99,10 @@ curl -fsSL -o "$tmp_path" "$asset_url"
 chmod +x "$tmp_path"
 mv -f "$tmp_path" "$DEST_PATH"
 
-# curl로 받은 파일은 보통 quarantine 속성이 없지만, 혹시 있으면 방어적으로 제거
-xattr -d com.apple.quarantine "$DEST_PATH" >/dev/null 2>&1 || true
+# curl로 받은 파일은 보통 quarantine 속성이 없지만, 혹시 있으면 방어적으로 제거 (macOS 전용)
+if [ "$OS" = "macos" ]; then
+    xattr -d com.apple.quarantine "$DEST_PATH" >/dev/null 2>&1 || true
+fi
 
 echo
 ok "vmctl $tag installed to $DEST_PATH"

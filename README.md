@@ -10,7 +10,7 @@
 irm https://raw.githubusercontent.com/nobreak-labs/vmctl-releases/main/install.ps1 | iex
 ```
 
-**macOS:**
+**macOS / Linux:**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nobreak-labs/vmctl-releases/main/install.sh | bash
@@ -26,3 +26,4 @@ curl -fsSL https://raw.githubusercontent.com/nobreak-labs/vmctl-releases/main/in
 - `vmctl-<version>-windows-amd64.exe`
 - `vmctl-<version>-macos-amd64`
 - `vmctl-<version>-macos-arm64`
+- `vmctl-<version>-linux-amd64`
