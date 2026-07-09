@@ -25,33 +25,41 @@ $ErrorActionPreference = "Stop"
 $BinName  = "vmctl.exe"
 $DestPath = Join-Path $InstallDir $BinName
 
-function Get-Release {
-    param([string]$Tag)
-    $uri = if ($Tag -eq "latest") {
-        "https://api.github.com/repos/$Repo/releases/latest"
+function Get-ReleaseTag {
+    param([string]$Version)
+    if ($Version -eq "latest") {
+        # .NET WebRequest를 사용하여 리다이렉트된 최종 URL에서 태그명을 추출합니다.
+        # 이 방법은 GitHub API Rate Limit를 발생시키지 않습니다.
+        $url = "https://github.com/$Repo/releases/latest"
+        $request = [System.Net.WebRequest]::Create($url)
+        $request.Method = "HEAD"
+        $request.AllowAutoRedirect = $true
+        try {
+            $response = $request.GetResponse()
+            $tag = ($response.ResponseUri.OriginalString -split '/')[-1]
+            $response.Close()
+            return $tag
+        } catch {
+            Write-Error "Failed to fetch latest release version from $url"
+            exit 1
+        }
     } else {
-        "https://api.github.com/repos/$Repo/releases/tags/$Tag"
+        return $Version
     }
-    Invoke-RestMethod -Uri $uri -Headers @{ "User-Agent" = "vmctl-installer" }
 }
 
 Write-Host "vmctl installer" -ForegroundColor Cyan
 
-$release = Get-Release -Tag $Version
-$tag = $release.tag_name
-$asset = $release.assets | Where-Object { $_.name -like "vmctl-*-windows-amd64.exe" } | Select-Object -First 1
-
-if (-not $asset) {
-    Write-Error "No Windows asset found in release '$tag' of $Repo"
-    exit 1
-}
+$tag = Get-ReleaseTag -Version $Version
+$assetName = "vmctl-$tag-windows-amd64.exe"
+$downloadUrl = "https://github.com/$Repo/releases/download/$tag/$assetName"
 
 Write-Host "Version: $tag"
-Write-Host "Downloading $($asset.name)..."
+Write-Host "Downloading $assetName..."
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 $tmpPath = "$DestPath.download"
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tmpPath -UseBasicParsing
+Invoke-WebRequest -Uri $downloadUrl -OutFile $tmpPath -UseBasicParsing
 Move-Item -Force $tmpPath $DestPath
 
 # 웹에서 받은 파일은 Zone.Identifier(차단 표시)가 붙을 수 있으므로 해제
@@ -75,3 +83,14 @@ if (($env:Path -split ";") -notcontains $InstallDir) {
 Write-Host ""
 Write-Host "vmctl $tag installed to $DestPath" -ForegroundColor Green
 Write-Host "Run 'vmctl version' to verify. Open a new terminal if the command is not found yet."
+
+# `$PROFILE`에 `vmctl completion powershell`을 추가해 자동완성을 켜려면
+# 실행 정책이 최소 RemoteSigned 이상이어야 스크립트가 로드된다.
+# Restricted(기본값)면 새 셸을 열 때마다 `$PROFILE` 실행이 조용히 막히거나 오류가 난다.
+$currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
+if ($currentPolicy -eq "Restricted" -or $currentPolicy -eq "Undefined") {
+    Write-Host ""
+    Write-Host "Note: PowerShell execution policy for CurrentUser is '$currentPolicy'." -ForegroundColor Yellow
+    Write-Host "To enable shell completion via `$PROFILE (see README), run this once first:" -ForegroundColor Yellow
+    Write-Host "  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser"
+}

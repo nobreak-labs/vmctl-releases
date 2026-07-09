@@ -63,32 +63,19 @@ fi
 info "vmctl installer"
 
 if [ "$VERSION" = "latest" ]; then
-    api_url="https://api.github.com/repos/$REPO/releases/latest"
+    # api.github.com 대신 github.com 리다이렉션을 사용하여 rate limit를 회피합니다.
+    latest_url="$(curl -fsSL -o /dev/null -w "%{url_effective}" "https://github.com/$REPO/releases/latest")"
+    tag="${latest_url##*/}"
 else
-    api_url="https://api.github.com/repos/$REPO/releases/tags/$VERSION"
+    tag="$VERSION"
 fi
 
-release_json="$(curl -fsSL -H "User-Agent: vmctl-installer" "$api_url")" || {
-    error "Failed to fetch release info from $api_url"
-    exit 1
-}
-
-tag="$(printf '%s' "$release_json" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
-if [ -z "$tag" ]; then
+if [ -z "$tag" ] || [ "$tag" = "latest" ]; then
     error "Could not determine release tag (repo: $REPO, version: $VERSION)"
     exit 1
 fi
 
-asset_url="$(printf '%s' "$release_json" \
-    | grep -o '"browser_download_url": *"[^"]*"' \
-    | sed -E 's/.*"(https:[^"]+)"$/\1/' \
-    | grep "vmctl-.*-${OS}-${ARCH}\$" \
-    | head -n1)"
-
-if [ -z "$asset_url" ]; then
-    error "No ${OS}-${ARCH} asset found in release '$tag' of $REPO"
-    exit 1
-fi
+asset_url="https://github.com/$REPO/releases/download/$tag/vmctl-$tag-${OS}-${ARCH}"
 
 info "Version: $tag"
 info "Downloading $(basename "$asset_url")..."
