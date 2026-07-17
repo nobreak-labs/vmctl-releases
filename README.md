@@ -1,5 +1,10 @@
 # vmctl-releases
 
+![Release](https://img.shields.io/github/v/release/nobreak-labs/vmctl-releases?label=release)
+![Downloads](https://img.shields.io/github/downloads/nobreak-labs/vmctl-releases/total)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+![Provider](https://img.shields.io/badge/provider-VMware-607078?logo=vmware&logoColor=white)
+
 `vmctl` 바이너리 배포 전용 저장소입니다. 이 저장소에는 빌드된 바이너리와 설치 스크립트만 미러링됩니다.
 
 ## 설치
